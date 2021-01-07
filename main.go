@@ -8,7 +8,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/urfave/cli"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -66,6 +68,23 @@ func main() {
 					return createTask(task)
 				},
 			},
+			{
+				Name:    "all",
+				Aliases: []string{"l"},
+				Usage:   "list all your tasks",
+				Action: func(c *cli.Context) error {
+					tasks, err := getAllTasks()
+					if err != nil {
+						if err == mongo.ErrNoDocuments {
+							fmt.Print("There is no task here\nIf you want to add a new task run `add 'task'`")
+							return nil
+						}
+						return err
+					}
+					printTasks((tasks))
+					return nil
+				},
+			},
 		},
 	}
 
@@ -75,8 +94,54 @@ func main() {
 	}
 }
 
+func printTasks(tasks []*Task) {
+	for i, v := range tasks {
+		if v.Completed {
+			color.Green("%d: %s", i+1, v.Text)
+		} else {
+			color.Yellow("%d: %s", i+1, v.Text)
+		}
+
+	}
+}
+
 func createTask(task *Task) error {
 	_, err := collection.InsertOne(ctx, task)
 	fmt.Println("Task created")
 	return err
+}
+
+func getAllTasks() ([]*Task, error) {
+	filter := bson.D{{}}
+	return filterTasks(filter)
+}
+
+func filterTasks(filter interface{}) ([]*Task, error) {
+	var tasks []*Task
+
+	cur, err := collection.Find(ctx, filter)
+	if err != nil {
+		return tasks, err
+	}
+
+	for cur.Next(ctx) {
+		var t Task
+		err = cur.Decode(&t)
+		if err != nil {
+			return tasks, err
+		}
+		tasks = append(tasks, &t)
+	}
+
+	if err := cur.Err(); err != nil {
+		return tasks, err
+	}
+
+	cur.Close(ctx)
+
+	if len(tasks) == 0 {
+		return tasks, mongo.ErrNoDocuments
+	}
+
+	return tasks, nil
 }
