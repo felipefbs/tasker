@@ -85,6 +85,15 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:    "done",
+				Aliases: []string{"d"},
+				Usage:   "Complete a task from your task list",
+				Action: func(c *cli.Context) error {
+					text := c.Args().First()
+					return completeTask(text)
+				},
+			},
 		},
 	}
 
@@ -144,4 +153,14 @@ func filterTasks(filter interface{}) ([]*Task, error) {
 	}
 
 	return tasks, nil
+}
+
+func completeTask(text string) error {
+	filter := bson.D{primitive.E{Key: "text", Value: text}}
+
+	update := bson.D{primitive.E{Key: "$set", Value: bson.D{primitive.E{Key: "completed", Value: true}}}}
+
+	t := &Task{}
+
+	return collection.FindOneAndUpdate(ctx, filter, update).Decode(t)
 }
