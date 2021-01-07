@@ -48,6 +48,21 @@ func main() {
 	app := &cli.App{
 		Name:  "tasker",
 		Usage: "A Simple program to manage your tasks from a terminal",
+		Action: func(c *cli.Context) error {
+			tasks, err := getPending()
+			if err != nil {
+				if err == mongo.ErrNoDocuments {
+					fmt.Print("There is no task here\nIf you want to add a new task run `add 'task'`")
+					return nil
+				}
+
+				return err
+			}
+
+			printTasks(tasks)
+
+			return nil
+		},
 		Commands: []cli.Command{
 			{
 				Name:    "add",
@@ -163,4 +178,12 @@ func completeTask(text string) error {
 	t := &Task{}
 
 	return collection.FindOneAndUpdate(ctx, filter, update).Decode(t)
+}
+
+func getPending() ([]*Task, error) {
+	filter := bson.D{
+		primitive.E{Key: "completed", Value: false},
+	}
+
+	return filterTasks(filter)
 }
